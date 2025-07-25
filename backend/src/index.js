@@ -8,19 +8,21 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
+const PORT = process.env.PORT || 3000;
+
+
 // Importar rutas
-const productRoutes = require('./routes/productRoutes');  // Ajustá la ruta si lo movés a src/routes
+const productRoutes = require('./routes/productRoutes');
 
 // Usar rutas
 app.use('/products', productRoutes);
 
-// Ruta base
+// Ruta de prueba
 app.get('/', (req, res) => {
   res.send('Servidor backend funcionando 🚀');
 });
 
 // Levantar servidor
-const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
   console.log(`Servidor escuchando en http://localhost:${PORT}`);
 });

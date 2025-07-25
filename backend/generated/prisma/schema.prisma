@@ -1,0 +1,104 @@
+generator client {
+  provider = "prisma-client-js"
+  output   = "../generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id         String   @id @default(uuid())
+  name       String
+  email      String   @unique
+  password   String
+  role       Role     @default(client)
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  // Relaciones
+  orders Order[]
+  cart   Cart?
+}
+
+enum Role {
+  client
+  admin
+}
+
+model Category {
+  id       String    @id @default(uuid())
+  name     String    @unique
+  products Product[] // Relación inversa con Product
+
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+}
+
+model Product {
+  id          String   @id @default(uuid())
+  name        String
+  description String
+  price       Float
+  image       String
+  created_at  DateTime @default(now())
+  updated_at  DateTime @updatedAt
+
+  category    Category? @relation(fields: [category_id], references: [id])
+  category_id String? // campo FK opcional
+
+  // Relaciones
+  sizes      ProductSize[]
+  orderItems OrderItem[]
+  cartItems  CartItem[]
+}
+
+model ProductSize {
+  id         String  @id @default(uuid())
+  product    Product @relation(fields: [product_id], references: [id], onDelete: Cascade)
+  product_id String
+  size       String
+  stock      Int
+}
+
+model Cart {
+  id         String     @id @default(uuid())
+  user       User       @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  user_id    String     @unique
+  items      CartItem[]
+  created_at DateTime   @default(now())
+  updated_at DateTime   @updatedAt
+}
+
+model CartItem {
+  id         String  @id @default(uuid())
+  cart       Cart    @relation(fields: [cart_id], references: [id], onDelete: Cascade)
+  cart_id    String
+  product    Product @relation(fields: [product_id], references: [id])
+  product_id String
+  size       String
+  quantity   Int
+}
+
+model Order {
+  id         String   @id @default(uuid())
+  user       User     @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  user_id    String
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+  total      Float
+
+  items OrderItem[]
+}
+
+model OrderItem {
+  id         String  @id @default(uuid())
+  order      Order   @relation(fields: [order_id], references: [id], onDelete: Cascade)
+  order_id   String
+  product    Product @relation(fields: [product_id], references: [id])
+  product_id String
+  size       String
+  quantity   Int
+  price      Float // Precio del producto al momento de la compra
+}

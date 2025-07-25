@@ -1,7 +1,6 @@
 const express = require('express');
 const router = express.Router();
 
-// Aquí importaremos el controlador que aún vamos a crear
 const productController = require('../controllers/productController');
 
 router.post('/', productController.createProduct);

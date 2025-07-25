@@ -7,88 +7,111 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-enum UserRole {
+model User {
+  id         String   @id @default(uuid())
+  name       String
+  email      String   @unique
+  password   String
+  role       Role     @default(client)
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  // Relaciones
+  orders Order[]
+  cart   Cart?
+}
+
+enum Role {
   client
   admin
 }
 
-model User {
-  id         String    @id @default(uuid())
-  name       String
-  email      String    @unique
-  password   String
-  role       UserRole
-  created_at DateTime  @default(now())
-  orders     Order[]
-  addresses  Address[]
-}
-
-model Address {
-  id         String   @id @default(uuid())
-  street     String
-  city       String
-  province   String
-  postalCode String
-  country    String
-  user       User     @relation(fields: [user_id], references: [id], onDelete: Cascade)
-  user_id    String
-  created_at DateTime @default(now())
-}
-
 model Category {
-  id       String    @id @default(uuid())
-  name     String
-  products Product[]
+  id         String    @id @default(uuid())
+  name       String    @unique
+  products   Product[] // Relación inversa con Product
+
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
 }
 
 model Product {
   id          String         @id @default(uuid())
   name        String
-  description String?
+  description String
   price       Float
-  image_url   String?
-  stock       Int
+  image       String
+  weight      Float          // ← NUEVO: Peso en kg
   created_at  DateTime       @default(now())
+  updated_at  DateTime       @updatedAt
+
   category    Category?      @relation(fields: [category_id], references: [id])
   category_id String?
+
+  // Relaciones
   sizes       ProductSize[]
   orderItems  OrderItem[]
+  cartItems   CartItem[]
 }
 
 model ProductSize {
   id         String   @id @default(uuid())
-  size       String
-  stock      Int
   product    Product  @relation(fields: [product_id], references: [id], onDelete: Cascade)
   product_id String
+  size       String
+  stock      Int
+}
+
+model Cart {
+  id         String     @id @default(uuid())
+  user       User       @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  user_id    String     @unique
+  items      CartItem[]
+  created_at DateTime   @default(now())
+  updated_at DateTime   @updatedAt
+}
+
+model CartItem {
+  id         String   @id @default(uuid())
+  cart       Cart     @relation(fields: [cart_id], references: [id], onDelete: Cascade)
+  cart_id    String
+  product    Product  @relation(fields: [product_id], references: [id])
+  product_id String
+  size       String
+  quantity   Int
+}
+
+model Shipping {
+  id             String   @id @default(uuid())
+  name           String
+  base_price     Float     // precio base
+  price_per_kilo Float     // adicional por kg
+  estimated_days Int       // entrega estimada en días
+
+  orders         Order[]
 }
 
 model Order {
-  id             String       @id @default(uuid())
-  status         String       @default("pending")
-  total          Float
-  payment_method String?
-  created_at     DateTime     @default(now())
-  user           User         @relation(fields: [user_id], references: [id])
-  user_id        String
-  items          OrderItem[]
+  id           String     @id @default(uuid())
+  user         User       @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  user_id      String
+  created_at   DateTime   @default(now())
+  updated_at   DateTime   @updatedAt
+  total        Float
+
+  shipping     Shipping   @relation(fields: [shipping_id], references: [id])
+  shipping_id  String     // ← NUEVO: Relación con método de envío
+
+  items        OrderItem[]
 }
 
 model OrderItem {
   id         String   @id @default(uuid())
-  quantity   Int
-  size       String
-  unit_price Float
-  product    Product  @relation(fields: [product_id], references: [id])
-  product_id String
   order      Order    @relation(fields: [order_id], references: [id], onDelete: Cascade)
   order_id   String
-}
-
-model Discount {
-  id         String   @id @default(uuid())
-  code       String   @unique
-  percentage Int
-  active     Boolean  @default(true)
-  expires_at DateTime?
+  product    Product  @relation(fields: [product_id], references: [id])
+  product_id String
+  size       String
+  quantity   Int
+  price      Float     // Precio del producto al momento de la compra
 }
