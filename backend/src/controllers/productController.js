@@ -1,7 +1,7 @@
 const { PrismaClient } = require('@prisma/client');
 const prisma = new PrismaClient();
 
-// Crear un producto con sus tamaños
+// Crear un producto con tamaños
 exports.createProduct = async (req, res) => {
   try {
     const { name, description, price, image, category_id, sizes } = req.body;
@@ -13,9 +13,13 @@ exports.createProduct = async (req, res) => {
         price,
         image,
         category_id,
-        sizes: {
-          create: sizes || [],
-        },
+          sizes: {
+        create: sizes.map(({ size, stock, weight }) => ({
+          size,
+          stock,
+          weight,   // Esto es obligatorio
+        })),
+      },
       },
       include: { sizes: true, category: true },
     });
@@ -27,7 +31,7 @@ exports.createProduct = async (req, res) => {
   }
 };
 
-// Buscar producto por ID
+// Obtener producto por ID
 exports.getProductById = async (req, res) => {
   const { id } = req.params;
 
@@ -52,7 +56,6 @@ exports.updateProduct = async (req, res) => {
   const { name, description, price, image, category_id, sizes } = req.body;
 
   try {
-    // Actualizar datos del producto
     await prisma.product.update({
       where: { id },
       data: {
@@ -64,19 +67,21 @@ exports.updateProduct = async (req, res) => {
       },
     });
 
-    // Actualizar tamaños: eliminar antiguos y crear nuevos
     if (sizes) {
+      // Eliminar talles antiguos
       await prisma.productSize.deleteMany({ where: { product_id: id } });
+
+      // Crear talles nuevos con peso incluido
       await prisma.productSize.createMany({
-        data: sizes.map(({ size, stock }) => ({
+        data: sizes.map(({ size, stock, weight }) => ({
+          product_id: id,
           size,
           stock,
-          product_id: id,
+          weight,
         })),
       });
     }
 
-    // Traer producto actualizado con relaciones
     const updatedProduct = await prisma.product.findUnique({
       where: { id },
       include: { sizes: true, category: true },
@@ -89,7 +94,7 @@ exports.updateProduct = async (req, res) => {
   }
 };
 
-// Eliminar producto por ID
+// Eliminar producto
 exports.deleteProduct = async (req, res) => {
   const { id } = req.params;
 
@@ -102,12 +107,12 @@ exports.deleteProduct = async (req, res) => {
   }
 };
 
+// Obtener todos los productos
 exports.getAllProducts = async (req, res) => {
   try {
-const products = await prisma.product.findMany(
-//{include: { sizes: true, category: true },} // comentar si no hay datos o no está listo
-
-);
+    const products = await prisma.product.findMany({
+      include: { sizes: true, category: true },
+    });
     res.json(products);
   } catch (error) {
     console.error(error);

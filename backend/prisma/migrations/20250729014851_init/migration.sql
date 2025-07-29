@@ -31,7 +31,6 @@ CREATE TABLE "Product" (
     "description" TEXT NOT NULL,
     "price" DOUBLE PRECISION NOT NULL,
     "image" TEXT NOT NULL,
-    "weight" DOUBLE PRECISION NOT NULL,
     "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updated_at" TIMESTAMP(3) NOT NULL,
     "category_id" TEXT,
@@ -42,9 +41,10 @@ CREATE TABLE "Product" (
 -- CreateTable
 CREATE TABLE "ProductSize" (
     "id" TEXT NOT NULL,
-    "product_id" TEXT NOT NULL,
     "size" TEXT NOT NULL,
     "stock" INTEGER NOT NULL,
+    "weight" DOUBLE PRECISION NOT NULL,
+    "product_id" TEXT NOT NULL,
 
     CONSTRAINT "ProductSize_pkey" PRIMARY KEY ("id")
 );
@@ -62,10 +62,10 @@ CREATE TABLE "Cart" (
 -- CreateTable
 CREATE TABLE "CartItem" (
     "id" TEXT NOT NULL,
-    "cart_id" TEXT NOT NULL,
-    "product_id" TEXT NOT NULL,
-    "size" TEXT NOT NULL,
     "quantity" INTEGER NOT NULL,
+    "cart_id" TEXT NOT NULL,
+    "product_size_id" TEXT NOT NULL,
+    "product_id" TEXT NOT NULL,
 
     CONSTRAINT "CartItem_pkey" PRIMARY KEY ("id")
 );
@@ -85,10 +85,10 @@ CREATE TABLE "Shipping" (
 CREATE TABLE "Order" (
     "id" TEXT NOT NULL,
     "user_id" TEXT NOT NULL,
+    "shipping_id" TEXT NOT NULL,
+    "total" DOUBLE PRECISION NOT NULL,
     "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updated_at" TIMESTAMP(3) NOT NULL,
-    "total" DOUBLE PRECISION NOT NULL,
-    "shipping_id" TEXT NOT NULL,
 
     CONSTRAINT "Order_pkey" PRIMARY KEY ("id")
 );
@@ -96,11 +96,11 @@ CREATE TABLE "Order" (
 -- CreateTable
 CREATE TABLE "OrderItem" (
     "id" TEXT NOT NULL,
-    "order_id" TEXT NOT NULL,
-    "product_id" TEXT NOT NULL,
-    "size" TEXT NOT NULL,
     "quantity" INTEGER NOT NULL,
     "price" DOUBLE PRECISION NOT NULL,
+    "order_id" TEXT NOT NULL,
+    "product_size_id" TEXT NOT NULL,
+    "product_id" TEXT NOT NULL,
 
     CONSTRAINT "OrderItem_pkey" PRIMARY KEY ("id")
 );
@@ -127,6 +127,9 @@ ALTER TABLE "Cart" ADD CONSTRAINT "Cart_user_id_fkey" FOREIGN KEY ("user_id") RE
 ALTER TABLE "CartItem" ADD CONSTRAINT "CartItem_cart_id_fkey" FOREIGN KEY ("cart_id") REFERENCES "Cart"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
+ALTER TABLE "CartItem" ADD CONSTRAINT "CartItem_product_size_id_fkey" FOREIGN KEY ("product_size_id") REFERENCES "ProductSize"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
 ALTER TABLE "CartItem" ADD CONSTRAINT "CartItem_product_id_fkey" FOREIGN KEY ("product_id") REFERENCES "Product"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
@@ -137,6 +140,9 @@ ALTER TABLE "Order" ADD CONSTRAINT "Order_shipping_id_fkey" FOREIGN KEY ("shippi
 
 -- AddForeignKey
 ALTER TABLE "OrderItem" ADD CONSTRAINT "OrderItem_order_id_fkey" FOREIGN KEY ("order_id") REFERENCES "Order"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "OrderItem" ADD CONSTRAINT "OrderItem_product_size_id_fkey" FOREIGN KEY ("product_size_id") REFERENCES "ProductSize"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "OrderItem" ADD CONSTRAINT "OrderItem_product_id_fkey" FOREIGN KEY ("product_id") REFERENCES "Product"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
