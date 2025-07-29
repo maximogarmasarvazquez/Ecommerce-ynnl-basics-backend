@@ -10,16 +10,34 @@ exports.createOrderItem = async (req, res) => {
       return res.status(400).json({ error: 'Faltan datos requeridos' });
     }
 
+    // Obtener el product_id desde productSize para guardar en el OrderItem
+    const productSize = await prisma.productSize.findUnique({
+      where: { id: product_size_id },
+    });
+
+    if (!productSize) {
+      return res.status(404).json({ error: 'ProductSize no encontrado' });
+    }
+
+    const product_id = productSize.product_id;
+
     const newOrderItem = await prisma.orderItem.create({
       data: {
-        order_id,
-        product_size_id,
         quantity,
         price,
+        order: {
+          connect: { id: order_id },
+        },
+        productSize: {
+          connect: { id: product_size_id },
+        },
+        product: {
+          connect: { id: product_id },  // <- conectamos el producto aquí
+        },
       },
       include: {
         productSize: {
-          include: { product: true }
+          include: { product: true },
         },
         order: true,
       },
@@ -32,6 +50,7 @@ exports.createOrderItem = async (req, res) => {
   }
 };
 
+
 // Obtener un OrderItem por ID
 exports.getOrderItemById = async (req, res) => {
   try {
@@ -40,9 +59,7 @@ exports.getOrderItemById = async (req, res) => {
     const orderItem = await prisma.orderItem.findUnique({
       where: { id },
       include: {
-        productSize: {
-          include: { product: true }
-        },
+        productSize: { include: { product: true } },
         order: true,
       },
     });
@@ -58,7 +75,7 @@ exports.getOrderItemById = async (req, res) => {
   }
 };
 
-// Actualizar un OrderItem (por ejemplo cantidad y precio)
+// Actualizar un OrderItem (cantidad y precio)
 exports.updateOrderItem = async (req, res) => {
   try {
     const { id } = req.params;
@@ -71,9 +88,7 @@ exports.updateOrderItem = async (req, res) => {
         price,
       },
       include: {
-        productSize: {
-          include: { product: true }
-        },
+        productSize: { include: { product: true } },
         order: true,
       },
     });
@@ -102,14 +117,12 @@ exports.deleteOrderItem = async (req, res) => {
 // Obtener todos los OrderItems de una orden
 exports.getOrderItemsByOrderId = async (req, res) => {
   try {
-    const { orderId } = req.params;
+    const { orderId } = req.params; // con "orderId", coincide con router
 
     const orderItems = await prisma.orderItem.findMany({
       where: { order_id: orderId },
       include: {
-        productSize: {
-          include: { product: true }
-        },
+        productSize: { include: { product: true } },
         order: true,
       },
     });

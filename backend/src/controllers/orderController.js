@@ -10,19 +10,29 @@ exports.createOrder = async (req, res) => {
       return res.status(400).json({ error: 'Faltan datos obligatorios' });
     }
 
-    // Calcular total
+    // Obtener datos de los ProductSize en una sola llamada
+    const productSizeIds = items.map(i => i.product_size_id);
+    const productSizes = await prisma.productSize.findMany({
+      where: { id: { in: productSizeIds } },
+      include: { product: true },
+    });
+
+    if (productSizes.length !== productSizeIds.length) {
+      return res.status(400).json({ error: 'Algún product_size_id no existe' });
+    }
+
+    // Mapear productSizes por id para acceso rápido
+    const psMap = {};
+    productSizes.forEach(ps => psMap[ps.id] = ps);
+
+    // Calcular total y peso
     let total = 0;
+    let totalWeight = 0;
+
     for (const item of items) {
-      const size = await prisma.productSize.findUnique({
-        where: { id: item.product_size_id },
-        include: { product: true },
-      });
-
-      if (!size) {
-        return res.status(400).json({ error: `ProductSize no encontrado: ${item.product_size_id}` });
-      }
-
-      total += size.product.price * item.quantity;
+      const ps = psMap[item.product_size_id];
+      total += ps.product.price * item.quantity;
+      totalWeight += ps.weight * item.quantity;
     }
 
     // Obtener método de envío
@@ -31,39 +41,28 @@ exports.createOrder = async (req, res) => {
       return res.status(400).json({ error: 'Método de envío no válido' });
     }
 
-    const pesoTotal = await Promise.all(
-      items.map(async (item) => {
-        const size = await prisma.productSize.findUnique({ where: { id: item.product_size_id } });
-        return size.weight * item.quantity;
-      })
-    );
-    const kilosTotales = pesoTotal.reduce((acc, w) => acc + w, 0);
-    const shippingCost = shipping.base_price + shipping.price_per_kilo * kilosTotales;
+    const shippingCost = shipping.base_price + shipping.price_per_kilo * totalWeight;
     total += shippingCost;
 
-    // Crear la orden
+    // Crear orden con items
     const newOrder = await prisma.order.create({
       data: {
         user_id,
         shipping_id,
         total,
         items: {
-          create: items.map((item) => ({
+          create: items.map(item => ({
             product_size_id: item.product_size_id,
             quantity: item.quantity,
-            price: item.price, // Precio final por ítem (puede venir en el body o usarse el del producto)
-            productId: item.product_id || undefined,
+            price: psMap[item.product_size_id].product.price,
+            product_id: psMap[item.product_size_id].product_id,
           })),
         },
       },
       include: {
         items: {
           include: {
-            productSize: {
-              include: {
-                product: true,
-              },
-            },
+            productSize: { include: { product: true } },
           },
         },
         shipping: true,
@@ -77,6 +76,7 @@ exports.createOrder = async (req, res) => {
     res.status(500).json({ error: 'Error al crear orden' });
   }
 };
+
 
 // Obtener todas las órdenes
 exports.getAllOrders = async (req, res) => {

@@ -1,7 +1,7 @@
 const { PrismaClient } = require('@prisma/client');
 const prisma = new PrismaClient();
 
-// Crear un item en el carrito
+// Crear un nuevo ítem en el carrito
 exports.createCartItem = async (req, res) => {
   try {
     const { cart_id, product_size_id, quantity } = req.body;
@@ -10,17 +10,29 @@ exports.createCartItem = async (req, res) => {
       return res.status(400).json({ error: 'Faltan datos requeridos' });
     }
 
-    // (Opcional) Validar que el product_size_id existe y tiene stock disponible
+    // Buscamos el ProductSize y product_id
+    const productSize = await prisma.productSize.findUnique({
+      where: { id: product_size_id },
+      include: { product: true },
+    });
 
+    if (!productSize) {
+      return res.status(404).json({ error: 'El product_size_id no existe' });
+    }
+
+    const product_id = productSize.product_id;
+
+    // Crear el ítem en el carrito
     const newCartItem = await prisma.cartItem.create({
       data: {
         cart_id,
         product_size_id,
+        product_id,
         quantity,
       },
       include: {
-        productSize: true,  // ahora se incluye productSize, no product
-        cart: true,
+        productSize: true,
+        product: true,
       },
     });
 
@@ -31,51 +43,79 @@ exports.createCartItem = async (req, res) => {
   }
 };
 
-// Obtener todos los items de un carrito
+// Obtener todos los ítems de un carrito
 exports.getCartItemsByCartId = async (req, res) => {
-  try {
-    const { cartId } = req.params;
+  const { cart_id } = req.params;
 
-    const items = await prisma.cartItem.findMany({
-      where: { cart_id: cartId },
-      include: { productSize: true },  // incluir productSize, no product
+  try {
+    const cartItems = await prisma.cartItem.findMany({
+      where: { cart_id },
+      include: {
+        product: true,
+        productSize: true,
+      },
     });
 
-    res.json(items);
+    res.status(200).json(cartItems);
   } catch (error) {
-    console.error(error);
-    res.status(500).json({ error: 'Error al obtener items del carrito' });
+    console.error('Error al obtener cart items:', error);
+    res.status(500).json({ error: 'Error interno del servidor' });
   }
 };
 
-// Actualizar cantidad de un item en el carrito
+// Eliminar un ítem del carrito
+exports.deleteCartItem = async (req, res) => {
+  const { id } = req.params;
+
+  try {
+    await prisma.cartItem.delete({
+      where: { id },
+    });
+
+    res.status(200).json({ message: 'Item eliminado correctamente' });
+  } catch (error) {
+    console.error('Error al eliminar cart item:', error);
+    res.status(500).json({ error: 'Error interno del servidor' });
+  }
+};
+
+// Actualizar un ítem del carrito
 exports.updateCartItem = async (req, res) => {
   try {
-    const { id } = req.params; // id del CartItem
-    const { quantity } = req.body;
+    const { id } = req.params;
+    const { quantity, product_size_id } = req.body;
 
-    const updated = await prisma.cartItem.update({
-      where: { id },
-      data: { quantity },
+    if (!quantity || !product_size_id) {
+      return res.status(400).json({ message: 'Faltan campos obligatorios' });
+    }
+
+    // Validar que el product_size_id exista y obtener product_id actualizado
+    const productSize = await prisma.productSize.findUnique({
+      where: { id: product_size_id },
     });
 
-    res.json(updated);
+    if (!productSize) {
+      return res.status(404).json({ message: 'El product_size_id no existe' });
+    }
+
+    const product_id = productSize.product_id;
+
+    const updatedItem = await prisma.cartItem.update({
+      where: { id },
+      data: {
+        quantity,
+        product_size_id,
+        product_id,
+      },
+      include: {
+        product: true,
+        productSize: true,
+      },
+    });
+
+    res.status(200).json(updatedItem);
   } catch (error) {
-    console.error(error);
-    res.status(500).json({ error: 'Error al actualizar item del carrito' });
-  }
-};
-
-// Eliminar item del carrito
-exports.deleteCartItem = async (req, res) => {
-  try {
-    const { id } = req.params;
-
-    await prisma.cartItem.delete({ where: { id } });
-
-    res.json({ message: 'Item eliminado del carrito' });
-  } catch (error) {
-    console.error(error);
-    res.status(500).json({ error: 'Error al eliminar item del carrito' });
+    console.error('Error al actualizar el cart item:', error);
+    res.status(500).json({ message: 'Error del servidor' });
   }
 };
