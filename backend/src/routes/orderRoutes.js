@@ -1,18 +1,23 @@
 const express = require('express');
 const router = express.Router();
-
 const orderController = require('../controllers/orderController');
+const { verifyToken, checkRole } = require('../middlewares/authMiddleware');
+const { validateOrder } = require('../validators/orderValidate'); // si usás validación
 
-router.post('/', orderController.createOrder);
+// Solo admin puede obtener todas las órdenes, actualizar y eliminar
+router.get('/', verifyToken, checkRole('admin'), orderController.getAllOrders);
+router.put('/:id', verifyToken, checkRole('admin'), validateOrder , orderController.updateOrder);
+router.delete('/:id', verifyToken, checkRole('admin'), orderController.deleteOrder);
 
-router.get('/', orderController.getAllOrders);
+// Creación y obtener órdenes por usuario requieren autenticación (cualquiera autenticado)
+// Crear orden (usuario autenticado puede crear su propia orden, no admin check necesario)
+router.post('/', verifyToken, validateOrder, orderController.createOrder);
 
-router.get('/user/:userId', orderController.getOrdersByUser); // <- corregido
+// Obtener órdenes por usuario (puede ser público o con token)
+// Si querés que solo el usuario o admin vea sus órdenes, deberías hacer un middleware especial o poner checkRole condicional en controlador
+router.get('/user/:userId', verifyToken, orderController.getOrdersByUser);
 
-router.get('/:id', orderController.getOrderById);
-
-router.put('/:id', orderController.updateOrder);
-
-router.delete('/:id', orderController.deleteOrder);
+// Obtener orden por id (puede ser público o protegido, acá te dejo autenticado)
+router.get('/:id', verifyToken, orderController.getOrderById);
 
 module.exports = router;

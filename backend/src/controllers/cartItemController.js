@@ -10,6 +10,13 @@ exports.createCartItem = async (req, res) => {
       return res.status(400).json({ error: 'Faltan datos requeridos' });
     }
 
+    // Validar que el carrito exista y sea del usuario
+    const cart = await prisma.cart.findUnique({ where: { id: cart_id } });
+    if (!cart) return res.status(404).json({ error: 'Carrito no encontrado' });
+    if (cart.user_id !== req.user.id) {
+      return res.status(403).json({ error: 'No tienes permiso para modificar este carrito' });
+    }
+
     // Buscamos el ProductSize y product_id
     const productSize = await prisma.productSize.findUnique({
       where: { id: product_size_id },
@@ -43,13 +50,19 @@ exports.createCartItem = async (req, res) => {
   }
 };
 
-// Obtener todos los ítems de un carrito
+// Obtener todos los ítems de un carrito (validar propiedad)
 exports.getCartItemsByCartId = async (req, res) => {
-  const { cart_id } = req.params;
-
   try {
+    const { cartId } = req.params;
+
+    const cart = await prisma.cart.findUnique({ where: { id: cartId } });
+    if (!cart) return res.status(404).json({ error: 'Carrito no encontrado' });
+    if (cart.user_id !== req.user.id) {
+      return res.status(403).json({ error: 'No tienes permiso para ver este carrito' });
+    }
+
     const cartItems = await prisma.cartItem.findMany({
-      where: { cart_id },
+      where: { cart_id: cartId },
       include: {
         product: true,
         productSize: true,
@@ -63,14 +76,22 @@ exports.getCartItemsByCartId = async (req, res) => {
   }
 };
 
-// Eliminar un ítem del carrito
+// Eliminar un ítem del carrito (validar propiedad)
 exports.deleteCartItem = async (req, res) => {
-  const { id } = req.params;
-
   try {
-    await prisma.cartItem.delete({
+    const { id } = req.params;
+
+    // Buscar item con carrito relacionado para validar propiedad
+    const cartItem = await prisma.cartItem.findUnique({
       where: { id },
+      include: { cart: true },
     });
+    if (!cartItem) return res.status(404).json({ error: 'Item no encontrado' });
+    if (cartItem.cart.user_id !== req.user.id) {
+      return res.status(403).json({ error: 'No tienes permiso para eliminar este item' });
+    }
+
+    await prisma.cartItem.delete({ where: { id } });
 
     res.status(200).json({ message: 'Item eliminado correctamente' });
   } catch (error) {
@@ -79,7 +100,7 @@ exports.deleteCartItem = async (req, res) => {
   }
 };
 
-// Actualizar un ítem del carrito
+// Actualizar un ítem del carrito (validar propiedad)
 exports.updateCartItem = async (req, res) => {
   try {
     const { id } = req.params;
@@ -89,11 +110,20 @@ exports.updateCartItem = async (req, res) => {
       return res.status(400).json({ message: 'Faltan campos obligatorios' });
     }
 
+    // Validar que el cartItem exista y sea del usuario
+    const cartItem = await prisma.cartItem.findUnique({
+      where: { id },
+      include: { cart: true },
+    });
+    if (!cartItem) return res.status(404).json({ error: 'Item no encontrado' });
+    if (cartItem.cart.user_id !== req.user.id) {
+      return res.status(403).json({ error: 'No tienes permiso para modificar este item' });
+    }
+
     // Validar que el product_size_id exista y obtener product_id actualizado
     const productSize = await prisma.productSize.findUnique({
       where: { id: product_size_id },
     });
-
     if (!productSize) {
       return res.status(404).json({ message: 'El product_size_id no existe' });
     }

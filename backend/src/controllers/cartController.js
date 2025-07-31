@@ -33,10 +33,10 @@ exports.createCart = async (req, res) => {
   }
 };
 
-// Obtener carrito por ID
 exports.getCartById = async (req, res) => {
   try {
     const { id } = req.params;
+    const user = req.user; // Viene del middleware verifyToken
 
     const cart = await prisma.cart.findUnique({
       where: { id },
@@ -56,12 +56,18 @@ exports.getCartById = async (req, res) => {
 
     if (!cart) return res.status(404).json({ error: 'Carrito no encontrado' });
 
+    // Validar acceso
+    if (user.role !== 'admin' && cart.user_id !== user.id) {
+      return res.status(403).json({ error: 'Acceso denegado' });
+    }
+
     res.json(cart);
   } catch (error) {
     console.error(error);
     res.status(500).json({ error: 'Error al obtener el carrito' });
   }
 };
+
 
 // Actualizar carrito (por ejemplo, cambiar el usuario asignado)
 exports.updateCart = async (req, res) => {

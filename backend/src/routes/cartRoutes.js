@@ -2,20 +2,18 @@ const express = require('express');
 const router = express.Router();
 
 const cartController = require('../controllers/cartController');
+const { verifyToken, checkRole } = require('../middlewares/authMiddleware');
+const { validateCart } = require('../validators/cartValidate');
+// Obtener todos los carritos (sólo admin)
+router.get('/', verifyToken, checkRole('admin'), cartController.getAllCarts);
 
-// Crear un carrito
-router.post('/', cartController.createCart);
+// Obtener carrito por ID (usuario dueño o admin)
+router.get('/:id', verifyToken, cartController.getCartById);
 
-// Obtener todos los carritos
-router.get('/', cartController.getAllCarts);
+router.post('/', verifyToken, checkRole('admin'), validateCart, cartController.createCart);
+router.put('/:id', verifyToken, checkRole('admin'), validateCart, cartController.updateCart);
 
-// Obtener carrito por ID
-router.get('/:id', cartController.getCartById);
-
-// Actualizar carrito por ID
-router.put('/:id', cartController.updateCart);
-
-// Eliminar carrito por ID
-router.delete('/:id', cartController.deleteCart);
+// Eliminar carrito por ID (usuario dueño o admin)
+router.delete('/:id', verifyToken, cartController.deleteCart);
 
 module.exports = router;

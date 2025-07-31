@@ -1,11 +1,17 @@
 const express = require('express');
 const router = express.Router();
 const productSizeController = require('../controllers/productSizeController');
+const { verifyToken, checkRole } = require('../middlewares/authMiddleware');
 
-router.post('/', productSizeController.createProductSize);
+// Solo admin puede crear, actualizar y eliminar
+const { validateProductSize } = require('../validators/productSizeValidate');
+
+router.post('/', verifyToken, checkRole('admin'), validateProductSize, productSizeController.createProductSize);
+router.put('/:id', verifyToken, checkRole('admin'), validateProductSize, productSizeController.updateProductSize);
+router.delete('/:id', verifyToken, checkRole('admin'), productSizeController.deleteProductSize);
+
+// Rutas públicas para ver talles
 router.get('/', productSizeController.getAllProductSizes);
 router.get('/:id', productSizeController.getProductSizeById);
-router.put('/:id', productSizeController.updateProductSize);
-router.delete('/:id', productSizeController.deleteProductSize);
 
 module.exports = router;

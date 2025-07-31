@@ -1,24 +1,60 @@
+
+const bcrypt = require('bcryptjs');
 const { PrismaClient } = require('@prisma/client');
 const prisma = new PrismaClient();
 
-// Crear usuario
+const validRoles = ['client', 'admin'];
+
 exports.createUser = async (req, res) => {
   try {
     const { name, email, password, role } = req.body;
-    // Aquí idealmente deberías hashear la password antes de guardar
 
-    const user = await prisma.user.create({
-      data: { name, email, password, role },
-    });
-    res.status(201).json(user);
-  } catch (error) {
-    console.error(error);
-    if (error.code === 'P2002') { // Prisma unique constraint failed
+    // Validar datos mínimos
+    if (!name || !email || !password) {
+      return res.status(400).json({ error: 'Faltan datos obligatorios' });
+    }
+
+    // Validar rol
+    if (role && !validRoles.includes(role)) {
+      return res.status(400).json({ error: 'Rol inválido' });
+    }
+
+    // Verificar que no exista usuario con el mismo email
+    const existingUser = await prisma.user.findUnique({ where: { email } });
+    if (existingUser) {
       return res.status(400).json({ error: 'Email ya registrado' });
     }
-    res.status(500).json({ error: 'Error creando usuario' });
+
+    const hashedPassword = await bcrypt.hash(password, 10);
+
+    const newUser = await prisma.user.create({
+      data: {
+        name,
+        email,
+        password: hashedPassword,
+        role: role || 'client', // si no viene rol, por defecto 'client'
+      },
+    });
+
+    // No devolver la password
+    const { password: _, ...userWithoutPassword } = newUser;
+
+    res.status(201).json({
+  message: 'Usuario creado exitosamente',
+  user: {
+    id: newUser.id,
+    name: newUser.name,
+    email: newUser.email,
+    role: newUser.role,
+    created_at: newUser.created_at,
+  },
+});
+  } catch (error) {
+    console.error('Error al crear usuario:', error);
+    res.status(500).json({ error: 'Error al crear el usuario' });
   }
 };
+
 
 // Obtener todos los usuarios
 exports.getAllUsers = async (req, res) => {
@@ -33,41 +69,115 @@ exports.getAllUsers = async (req, res) => {
 
 // Obtener usuario por ID
 exports.getUserById = async (req, res) => {
+  const { id } = req.params;
+  const tokenUserId = req.user?.id;
+  const tokenUserRole = req.user?.role;
+
+  // Validar que el usuario sea admin o que esté accediendo a su propio perfil
+  if (tokenUserRole !== 'admin' && tokenUserId !== id) {
+    return res.status(403).json({ error: 'Acceso denegado' });
+  }
+
   try {
-    const { id } = req.params;
-    const user = await prisma.user.findUnique({ where: { id } });
-    if (!user) return res.status(404).json({ error: 'Usuario no encontrado' });
+    const user = await prisma.user.findUnique({
+      where: { id },
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        role: true, // No se incluye password
+      },
+    });
+
+    if (!user) {
+      return res.status(404).json({ error: 'Usuario no encontrado' });
+    }
+
     res.json(user);
   } catch (error) {
-    console.error(error);
-    res.status(500).json({ error: 'Error buscando usuario' });
+    console.error('[ERROR getUserById]:', error);
+    res.status(500).json({ error: 'Error al obtener el usuario' });
   }
 };
 
+exports.getUserById = async (req, res) => {
+  const { id } = req.params;
+  const tokenUserId = req.user?.id;
+  const tokenUserRole = req.user?.role;
+
+  if (tokenUserRole !== 'admin' && String(tokenUserId) !== String(id)) {
+    return res.status(403).json({ error: 'Acceso denegado' });
+  }
+
+  try {
+    const user = await prisma.user.findUnique({
+      where: { id },
+      select: { id: true, name: true, email: true, role: true },
+    });
+
+    if (!user) {
+      return res.status(404).json({ error: 'Usuario no encontrado' });
+    }
+
+    res.json(user);
+  } catch (error) {
+    console.error('[ERROR getUserById]:', error);
+    res.status(500).json({ error: 'Error al obtener el usuario' });
+  }
+};
+
+
 // Actualizar usuario
 exports.updateUser = async (req, res) => {
+  const { id } = req.params;
+  const tokenUserId = req.user?.id;
+  const tokenUserRole = req.user?.role;
+
+  if (tokenUserRole !== 'admin' && String(tokenUserId) !== String(id)) {
+    return res.status(403).json({ error: 'Acceso denegado' });
+  }
+
+  const { name, email, password } = req.body;
+
+  const dataToUpdate = {};
+  if (name) dataToUpdate.name = name;
+  if (email) dataToUpdate.email = email;
+
+  if (password && password.trim() !== '') {
+    const bcrypt = require('bcryptjs');
+    dataToUpdate.password = await bcrypt.hash(password, 10);
+  }
+
   try {
-    const { id } = req.params;
-    const { name, email, password, role } = req.body;
     const updatedUser = await prisma.user.update({
       where: { id },
-      data: { name, email, password, role },
+      data: dataToUpdate,
+      select: { id: true, name: true, email: true, role: true },
     });
+
     res.json(updatedUser);
   } catch (error) {
-    console.error(error);
+    console.error('[ERROR updateUser]:', error);
     res.status(500).json({ error: 'Error actualizando usuario' });
   }
 };
 
 // Eliminar usuario
 exports.deleteUser = async (req, res) => {
+  const { id } = req.params;
+  const userId = req.user.id;
+  const userRole = req.user.role;
+
+  // Solo el admin o el mismo usuario puede eliminar
+  if (userRole !== 'admin' && userId !== id) {
+    return res.status(403).json({ error: 'Acceso denegado.' });
+  }
+
   try {
-    const { id } = req.params;
     await prisma.user.delete({ where: { id } });
-    res.json({ message: 'Usuario eliminado correctamente' });
+    return res.json({ message: 'Usuario eliminado exitosamente.' });
   } catch (error) {
     console.error(error);
-    res.status(500).json({ error: 'Error eliminando usuario' });
+    return res.status(500).json({ error: 'Error al eliminar el usuario.' });
   }
 };

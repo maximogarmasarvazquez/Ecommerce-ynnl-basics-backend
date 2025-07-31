@@ -12,4 +12,24 @@ async function main() {
   }
 }
 
+const bcrypt = require('bcryptjs');
+const jwt = require('jsonwebtoken');
+
+async function test() {
+  const plainPassword = 'miPassword123';
+  const hashedPassword = await bcrypt.hash(plainPassword, 10);
+
+  console.log('Hashed password:', hashedPassword);
+
+  const isValid = await bcrypt.compare(plainPassword, hashedPassword);
+  console.log('Password es válido?', isValid);
+
+  if (isValid) {
+    const token = jwt.sign({ userId: '123', role: 'client' }, 'supersecreto', { expiresIn: '1h' });
+    console.log('Token generado:', token);
+  }
+}
+
+test();
+
 main();
