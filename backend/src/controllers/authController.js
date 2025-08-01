@@ -52,35 +52,26 @@ exports.register = async (req, res) => {
 
 // Login
 exports.login = async (req, res) => {
-  const errors = validationResult(req);
-  if (!errors.isEmpty()) {
-    return res.status(400).json({ errors: errors.array() });
-  }
-
   const { email, password } = req.body;
 
-  try {
-    const user = await prisma.user.findUnique({ where: { email } });
+  const user = await prisma.user.findUnique({ where: { email } });
+  if (!user) return res.status(400).json({ message: "Usuario no encontrado" });
 
-    if (!user) {
-      return res.status(401).json({ error: 'Credenciales inválidas' });
+  const isMatch = await bcrypt.compare(password, user.password);
+  if (!isMatch) return res.status(400).json({ message: "Contraseña incorrecta" });
+
+  const token = jwt.sign(
+    { id: user.id, role: user.role },
+    process.env.JWT_SECRET,
+    { expiresIn: "1h" }
+  );
+
+  res.json({
+    token,
+    user: {
+      id: user.id,
+      email: user.email,
+      role: user.role
     }
-
-    const isPasswordValid = await bcrypt.compare(password, user.password);
-
-    if (!isPasswordValid) {
-      return res.status(401).json({ error: 'Credenciales inválidas' });
-    }
-
-    const token = jwt.sign(
-      { id: user.id, role: user.role },
-      process.env.JWT_SECRET,
-      { expiresIn: '1h' }
-    );
-
-    res.json({ token });
-  } catch (error) {
-    console.error('Error en login:', error);
-    res.status(500).json({ error: 'Error en el login' });
-  }
+  });
 };
