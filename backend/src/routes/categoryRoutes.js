@@ -8,7 +8,7 @@ router.get('/', categoryController.getAllCategories);
 router.get('/:id', categoryController.getCategoryById);
 
 // Solo admin
-router.post('/', validateCategory, categoryController.createCategory);
+router.post('/', verifyToken, checkRole('admin'), validateCategory, categoryController.createCategory);
 router.put('/:id', verifyToken, checkRole('admin'), validateCategory, categoryController.updateCategory);
 router.delete('/:id', verifyToken, checkRole('admin'), categoryController.deleteCategory);
 

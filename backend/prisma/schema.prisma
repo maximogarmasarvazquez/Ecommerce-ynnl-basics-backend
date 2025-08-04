@@ -13,16 +13,34 @@ enum Role {
 }
 
 model User {
-  id         String   @id @default(uuid())
+  id         String    @id @default(uuid())
   name       String
-  email      String   @unique
+  email      String    @unique
   password   String
-  role       Role     @default(client)
-  created_at DateTime @default(now())
-  updated_at DateTime @updatedAt
+  role       Role      @default(client)
+  created_at DateTime  @default(now())
+  updated_at DateTime  @updatedAt
 
-  orders Order[]
-  cart   Cart?
+  orders     Order[]
+  cart       Cart?
+  addresses  Address[]
+}
+
+model Address {
+  id          String   @id @default(uuid())
+  user_id     String
+  user        User     @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  street      String
+  city        String
+  state       String
+  country     String
+  postal_code String
+  phone       String?
+
+  is_default  Boolean  @default(false)
+
+  orders      Order[]
 }
 
 model Category {
@@ -35,33 +53,33 @@ model Category {
 }
 
 model Product {
-  id          String   @id @default(uuid())
+  id          String        @id @default(uuid())
   name        String
   description String
   price       Float
   image       String
-  created_at  DateTime @default(now())
-  updated_at  DateTime @updatedAt
+  created_at  DateTime      @default(now())
+  updated_at  DateTime      @updatedAt
 
   category_id String?
-  category    Category? @relation(fields: [category_id], references: [id])
+  category    Category?     @relation(fields: [category_id], references: [id])
 
-  sizes      ProductSize[]
-  orderItems OrderItem[]   @relation("ProductToOrderItem")
-  cartItems  CartItem[]    @relation("ProductToCartItem")
+  sizes       ProductSize[]
+  orderItems  OrderItem[]   @relation("ProductToOrderItem")
+  cartItems   CartItem[]    @relation("ProductToCartItem")
 }
 
 model ProductSize {
-  id     String @id @default(uuid())
-  size   String
-  stock  Int
-  weight Float
+  id           String       @id @default(uuid())
+  size         String
+  stock        Int
+  weight       Float
 
-  product_id String
-  product    Product @relation(fields: [product_id], references: [id], onDelete: Cascade)
+  product_id   String
+  product      Product       @relation(fields: [product_id], references: [id], onDelete: Cascade)
 
-  cartItems  CartItem[]
-  orderItems OrderItem[]
+  cartItems    CartItem[]
+  orderItems   OrderItem[]
 }
 
 model Cart {
@@ -74,22 +92,21 @@ model Cart {
 }
 
 model CartItem {
-  id       String @id @default(uuid())
-  quantity Int
+  id              String       @id @default(uuid())
+  quantity        Int
 
-  cart_id String
-  cart    Cart   @relation(fields: [cart_id], references: [id], onDelete: Cascade)
+  cart_id         String
+  cart            Cart         @relation(fields: [cart_id], references: [id], onDelete: Cascade)
 
   product_size_id String
-  productSize     ProductSize @relation(fields: [product_size_id], references: [id])
+  productSize     ProductSize  @relation(fields: [product_size_id], references: [id])
 
-  // Relación inversa hacia Product
-  product_id String
-  product    Product @relation("ProductToCartItem", fields: [product_id], references: [id])
+  product_id      String
+  product         Product      @relation("ProductToCartItem", fields: [product_id], references: [id])
 }
 
 model Shipping {
-  id             String @id @default(uuid())
+  id             String   @id @default(uuid())
   name           String
   base_price     Float
   price_per_kilo Float
@@ -99,31 +116,47 @@ model Shipping {
 }
 
 model Order {
-  id          String   @id @default(uuid())
-  user_id     String
-  shipping_id String
-  total       Float
-  created_at  DateTime @default(now())
-  updated_at  DateTime @updatedAt
+  id           String     @id @default(uuid())
+  user_id      String
+  shipping_id  String
+  address_id   String
+  total        Float
+  created_at   DateTime   @default(now())
+  updated_at   DateTime   @updatedAt
 
-  user     User     @relation(fields: [user_id], references: [id], onDelete: Cascade)
-  shipping Shipping @relation(fields: [shipping_id], references: [id])
+  user         User       @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  shipping     Shipping   @relation(fields: [shipping_id], references: [id])
+  address      Address    @relation(fields: [address_id], references: [id], onDelete: Cascade)
 
-  items OrderItem[]
+  items        OrderItem[]
 }
 
 model OrderItem {
-  id       String @id @default(uuid())
-  quantity Int
-  price    Float
+  id              String       @id @default(uuid())
+  quantity        Int
+  price           Float
 
-  order_id String
-  order    Order  @relation(fields: [order_id], references: [id], onDelete: Cascade)
+  order_id        String
+  order           Order        @relation(fields: [order_id], references: [id], onDelete: Cascade)
 
   product_size_id String
-  productSize     ProductSize @relation(fields: [product_size_id], references: [id])
+  productSize     ProductSize  @relation(fields: [product_size_id], references: [id])
 
-  // Relación inversa hacia Product
-  product_id String
-  product    Product @relation("ProductToOrderItem", fields: [product_id], references: [id])
+  product_id      String
+  product         Product      @relation("ProductToOrderItem", fields: [product_id], references: [id])
+}
+
+model Payment {
+  id             String    @id @default(uuid())
+  
+  order_id       String    @unique  // Si solo permitís un pago por orden, agregar @unique
+  order          Order     @relation(fields: [order_id], references: [id], onDelete: Cascade)
+  
+  payment_method String
+  status         String
+  amount         Float
+  transaction_id String?
+  
+  created_at     DateTime  @default(now())
+  updated_at     DateTime  @updatedAt
 }

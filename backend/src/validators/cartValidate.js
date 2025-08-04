@@ -5,10 +5,10 @@ const validateCart = [
     .notEmpty().withMessage('user_id es obligatorio')
     .isUUID().withMessage('user_id debe ser un UUID válido'),
 
- body('items')
-  .isArray({ min: 1 })
-  .withMessage('items debe ser un arreglo con al menos un item')
-  .bail(), // para que no siga validando items si no es arreglo
+  body('items')
+    .isArray({ min: 1 })
+    .withMessage('items debe ser un arreglo con al menos un ítem')
+    .bail(),
 
   body('items.*.product_size_id')
     .notEmpty().withMessage('product_size_id es obligatorio')

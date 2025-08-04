@@ -37,6 +37,8 @@ const cartItemRoutes = require('./routes/cartItemRoutes');
 const orderRoutes = require('./routes/orderRoutes');
 const shippingRoutes = require('./routes/shippingRoutes');
 const orderItemRoutes = require('./routes/orderItemRoutes');
+const addressRoutes = require('./routes/addressRoutes');
+const paymentRoutes = require('./routes/paymentRoutes');
 
 // Usar rutas
 app.use('/products', productRoutes);
@@ -48,6 +50,8 @@ app.use('/carts', cartRoutes);
 app.use('/orders', orderRoutes);
 app.use('/shippings', shippingRoutes);
 app.use('/orderItems', orderItemRoutes);
+app.use('/addresses', addressRoutes);
+app.use('/payments', paymentRoutes);
 
 // Ruta de prueba
 app.get('/', (req, res) => {

@@ -1,16 +1,26 @@
 const { PrismaClient } = require('@prisma/client');
 const prisma = new PrismaClient();
 
-// Crear una orden
+// Crear una orden y su pago
 exports.createOrder = async (req, res) => {
   try {
-    const { user_id, shipping_id, items } = req.body;
+    const userId = req.user.id;
+    const { shipping_id, address_id, items } = req.body;
 
-    if (!user_id || !shipping_id || !items || items.length === 0) {
-      return res.status(400).json({ error: 'Faltan datos obligatorios' });
+    if (!shipping_id || !items || !Array.isArray(items) || items.length === 0) {
+      return res.status(400).json({ error: 'Faltan datos obligatorios o items inválidos' });
     }
 
-    // Obtener datos de los ProductSize en una sola llamada
+    // Validar dirección si se pasa y que pertenezca al usuario o admin
+    if (address_id) {
+      const address = await prisma.address.findUnique({ where: { id: address_id } });
+      if (!address) return res.status(400).json({ error: 'Dirección inválida' });
+      if (address.user_id !== userId && req.user.role !== 'admin') {
+        return res.status(403).json({ error: 'No tienes permiso para usar esta dirección' });
+      }
+    }
+
+    // Validar productSizes y cargar productos
     const productSizeIds = items.map(i => i.product_size_id);
     const productSizes = await prisma.productSize.findMany({
       where: { id: { in: productSizeIds } },
@@ -21,14 +31,12 @@ exports.createOrder = async (req, res) => {
       return res.status(400).json({ error: 'Algún product_size_id no existe' });
     }
 
-    // Mapear productSizes por id para acceso rápido
     const psMap = {};
     productSizes.forEach(ps => psMap[ps.id] = ps);
 
     // Calcular total y peso
     let total = 0;
     let totalWeight = 0;
-
     for (const item of items) {
       const ps = psMap[item.product_size_id];
       total += ps.product.price * item.quantity;
@@ -44,11 +52,12 @@ exports.createOrder = async (req, res) => {
     const shippingCost = shipping.base_price + shipping.price_per_kilo * totalWeight;
     total += shippingCost;
 
-    // Crear orden con items
+    // Crear orden y luego el pago
     const newOrder = await prisma.order.create({
       data: {
-        user_id,
+        user_id: userId,
         shipping_id,
+        address_id: address_id || null,
         total,
         items: {
           create: items.map(item => ({
@@ -67,33 +76,43 @@ exports.createOrder = async (req, res) => {
         },
         shipping: true,
         user: true,
+        address: true,
       },
     });
 
-    res.status(201).json(newOrder);
+    const payment = await prisma.payment.create({
+      data: {
+        order_id: newOrder.id,
+        payment_method: 'mercado_pago', // Esto lo podés cambiar si usás otro método
+        status: 'pending',
+        amount: total,
+      },
+    });
+
+    res.status(201).json({ order: newOrder, payment });
   } catch (error) {
     console.error('Error al crear orden:', error);
     res.status(500).json({ error: 'Error al crear orden' });
   }
 };
 
-
 // Obtener todas las órdenes
 exports.getAllOrders = async (req, res) => {
   try {
+    const whereClause = req.user.role === 'admin' ? {} : { user_id: req.user.id };
+
     const orders = await prisma.order.findMany({
+      where: whereClause,
       include: {
         user: true,
         shipping: true,
+        address: true,
         items: {
           include: {
-            productSize: {
-              include: {
-                product: true,
-              },
-            },
+            productSize: { include: { product: true } },
           },
         },
+        payment: true,
       },
     });
 
@@ -114,19 +133,21 @@ exports.getOrderById = async (req, res) => {
       include: {
         user: true,
         shipping: true,
+        address: true,
         items: {
           include: {
-            productSize: {
-              include: {
-                product: true,
-              },
-            },
+            productSize: { include: { product: true } },
           },
         },
+        payment: true,
       },
     });
 
     if (!order) return res.status(404).json({ error: 'Orden no encontrada' });
+
+    if (order.user_id !== req.user.id && req.user.role !== 'admin') {
+      return res.status(403).json({ error: 'No tienes permiso para ver esta orden' });
+    }
 
     res.json(order);
   } catch (error) {
@@ -135,59 +156,33 @@ exports.getOrderById = async (req, res) => {
   }
 };
 
-// Eliminar orden
-exports.deleteOrder = async (req, res) => {
-  try {
-    const { id } = req.params;
-
-    await prisma.order.delete({ where: { id } });
-
-    res.json({ message: 'Orden eliminada correctamente' });
-  } catch (error) {
-    console.error('Error al eliminar orden:', error);
-    res.status(500).json({ error: 'Error al eliminar orden' });
-  }
-};
-
-// (Opcional) Obtener órdenes de un usuario
-exports.getOrdersByUser = async (req, res) => {
-  try {
-    const { userId } = req.params;
-
-    const orders = await prisma.order.findMany({
-      where: { user_id: userId },
-      include: {
-        shipping: true,
-        items: {
-          include: {
-            productSize: {
-              include: { product: true },
-            },
-          },
-        },
-      },
-    });
-
-    res.json(orders);
-  } catch (error) {
-    console.error('Error al obtener órdenes del usuario:', error);
-    res.status(500).json({ error: 'Error al obtener órdenes del usuario' });
-  }
-};
-
-// Actualizar una orden
+// Actualizar orden
 exports.updateOrder = async (req, res) => {
   try {
     const { id } = req.params;
-    const { shipping_id, items } = req.body;
+    const { shipping_id } = req.body;
 
-    // Por simplicidad, no permitimos actualizar el user_id
+    const order = await prisma.order.findUnique({ where: { id } });
+    if (!order) return res.status(404).json({ error: 'Orden no encontrada' });
+
+    if (order.user_id !== req.user.id && req.user.role !== 'admin') {
+      return res.status(403).json({ error: 'No tienes permiso para modificar esta orden' });
+    }
+
+    if (!shipping_id) {
+      return res.status(400).json({ error: 'shipping_id es obligatorio para actualizar' });
+    }
+
+    const shipping = await prisma.shipping.findUnique({ where: { id: shipping_id } });
+    if (!shipping) {
+      return res.status(400).json({ error: 'Método de envío inválido' });
+    }
+
     const updatedOrder = await prisma.order.update({
       where: { id },
       data: {
         shipping_id,
         updated_at: new Date(),
-        // Si querés actualizar los items, hay que hacer lógica adicional con deleteMany/create
       },
     });
 
@@ -195,5 +190,26 @@ exports.updateOrder = async (req, res) => {
   } catch (error) {
     console.error('Error al actualizar orden:', error);
     res.status(500).json({ error: 'Error al actualizar orden' });
+  }
+};
+
+// Eliminar orden
+exports.deleteOrder = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const order = await prisma.order.findUnique({ where: { id } });
+    if (!order) return res.status(404).json({ error: 'Orden no encontrada' });
+
+    if (order.user_id !== req.user.id && req.user.role !== 'admin') {
+      return res.status(403).json({ error: 'No tienes permiso para eliminar esta orden' });
+    }
+
+    await prisma.order.delete({ where: { id } });
+
+    res.json({ message: 'Orden eliminada correctamente' });
+  } catch (error) {
+    console.error('Error al eliminar orden:', error);
+    res.status(500).json({ error: 'Error al eliminar orden' });
   }
 };

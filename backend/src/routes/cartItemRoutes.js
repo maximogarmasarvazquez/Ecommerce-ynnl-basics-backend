@@ -3,17 +3,18 @@ const router = express.Router();
 const cartItemController = require('../controllers/cartItemController');
 const { verifyToken } = require('../middlewares/authMiddleware');
 const { validateCartItems } = require('../validators/cartItemValidate');
+const { checkOwnership } = require('../middlewares/checkOwnership'); // Asumiendo que existe para validar propiedad
 
 // Crear ítem solo si es dueño del carrito
 router.post('/', verifyToken, validateCartItems, cartItemController.createCartItem);
 
 // Obtener items de un carrito solo si es dueño
-router.get('/:cartId', verifyToken, validateCartItems, cartItemController.getCartItemsByCartId);
+router.get('/:cartId', verifyToken, cartItemController.getCartItemsByCartId);
 
 // Actualizar ítem, validar propiedad
-router.put('/:id', verifyToken, validateCartItems, cartItemController.updateCartItem);
+router.put('/:id', verifyToken, checkOwnership('cartItem'), validateCartItems, cartItemController.updateCartItem);
 
 // Eliminar ítem, validar propiedad
-router.delete('/:id', verifyToken, validateCartItems, cartItemController.deleteCartItem);
+router.delete('/:id', verifyToken, checkOwnership('cartItem'), cartItemController.deleteCartItem);
 
 module.exports = router;

@@ -1,12 +1,29 @@
 const { PrismaClient } = require('@prisma/client');
 const prisma = new PrismaClient();
 
-// Crear un carrito para un usuario
+// Crear un carrito para un usuario autenticado
 exports.createCart = async (req, res) => {
   try {
-    const { userId } = req.body;
+    const userId = req.user.id;
 
-    // Opcional: validar que el usuario existe
+    // Si ya tiene un carrito, lo devuelve
+    const existingCart = await prisma.cart.findUnique({
+      where: { user_id: userId },
+      include: {
+        user: true,
+        items: {
+          include: {
+            productSize: {
+              include: {
+                product: true,
+              },
+            },
+          },
+        },
+      },
+    });
+
+    if (existingCart) return res.json(existingCart);
 
     const cart = await prisma.cart.create({
       data: {
@@ -19,10 +36,10 @@ exports.createCart = async (req, res) => {
             productSize: {
               include: {
                 product: true,
-              }
-            }
-          }
-        }
+              },
+            },
+          },
+        },
       },
     });
 
@@ -33,30 +50,30 @@ exports.createCart = async (req, res) => {
   }
 };
 
+// Obtener carrito por ID (solo el dueño o admin puede verlo)
 exports.getCartById = async (req, res) => {
   try {
     const { id } = req.params;
-    const user = req.user; // Viene del middleware verifyToken
+    const user = req.user;
 
     const cart = await prisma.cart.findUnique({
       where: { id },
       include: {
+        user: true,
         items: {
           include: {
             productSize: {
               include: {
                 product: true,
-              }
-            }
-          }
+              },
+            },
+          },
         },
-        user: true,
       },
     });
 
     if (!cart) return res.status(404).json({ error: 'Carrito no encontrado' });
 
-    // Validar acceso
     if (user.role !== 'admin' && cart.user_id !== user.id) {
       return res.status(403).json({ error: 'Acceso denegado' });
     }
@@ -68,8 +85,7 @@ exports.getCartById = async (req, res) => {
   }
 };
 
-
-// Actualizar carrito (por ejemplo, cambiar el usuario asignado)
+// Actualizar carrito (solo admin)
 exports.updateCart = async (req, res) => {
   try {
     const { id } = req.params;
@@ -85,10 +101,10 @@ exports.updateCart = async (req, res) => {
             productSize: {
               include: {
                 product: true,
-              }
-            }
-          }
-        }
+              },
+            },
+          },
+        },
       },
     });
 
@@ -99,10 +115,19 @@ exports.updateCart = async (req, res) => {
   }
 };
 
-// Eliminar carrito
+// Eliminar carrito (admin o dueño)
 exports.deleteCart = async (req, res) => {
   try {
     const { id } = req.params;
+    const user = req.user;
+
+    const cart = await prisma.cart.findUnique({ where: { id } });
+    if (!cart) return res.status(404).json({ error: 'Carrito no encontrado' });
+
+    if (user.role !== 'admin' && cart.user_id !== user.id) {
+      return res.status(403).json({ error: 'No autorizado para eliminar este carrito' });
+    }
+
     await prisma.cart.delete({ where: { id } });
     res.json({ message: 'Carrito eliminado correctamente' });
   } catch (error) {
@@ -111,8 +136,13 @@ exports.deleteCart = async (req, res) => {
   }
 };
 
-// Obtener todos los carritos (opcional)
+// Obtener todos los carritos (solo admin)
 exports.getAllCarts = async (req, res) => {
+  const user = req.user;
+  if (user.role !== 'admin') {
+    return res.status(403).json({ error: 'Acceso denegado' });
+  }
+
   try {
     const carts = await prisma.cart.findMany({
       include: {
@@ -122,12 +152,13 @@ exports.getAllCarts = async (req, res) => {
             productSize: {
               include: {
                 product: true,
-              }
-            }
-          }
-        }
+              },
+            },
+          },
+        },
       },
     });
+
     res.json(carts);
   } catch (error) {
     console.error(error);
