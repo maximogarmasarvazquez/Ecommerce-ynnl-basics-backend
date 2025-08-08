@@ -6,8 +6,8 @@ const handleValidation = require('../middlewares/validationHandler');
 const { verifyToken, checkRole } = require('../middlewares/authMiddleware');
 
 // Público
-router.get('/', productController.getAllProducts);
-router.get('/:id', productController.getProductById);
+router.get('/', verifyToken, productController.getAllProducts);
+router.get('/:id',verifyToken, productController.getProductById);
 
 // Solo admin puede crear, editar y borrar
 router.post('/', verifyToken, checkRole('admin'), validateProduct, handleValidation, productController.createProduct);

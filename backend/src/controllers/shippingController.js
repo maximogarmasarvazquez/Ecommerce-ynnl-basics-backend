@@ -91,3 +91,47 @@ exports.deleteShipping = async (req, res) => {
     res.status(500).json({ message: 'Error al eliminar método de envío' });
   }
 };
+
+// NUEVO: Calcular costo estimado de envío
+exports.calculateShippingCost = async (req, res) => {
+  try {
+    const { items, postal_code } = req.body; 
+    // items: [{ product_size_id, quantity }, ...]
+
+    if (!items || !Array.isArray(items) || items.length === 0) {
+      return res.status(400).json({ error: 'Debe enviar items para calcular el envío' });
+    }
+
+    // Calcular peso total
+    let totalWeight = 0;
+    for (const item of items) {
+      const productSize = await prisma.productSize.findUnique({
+        where: { id: item.product_size_id }
+      });
+      if (!productSize) {
+        return res.status(400).json({ error: `Product size no encontrado: ${item.product_size_id}` });
+      }
+      totalWeight += productSize.weight * item.quantity;
+    }
+
+    // Obtener método de envío para calcular costo (aquí podés mejorar según postal_code)
+    const shippingOption = await prisma.shipping.findFirst();
+
+    if (!shippingOption) {
+      return res.status(500).json({ error: 'No hay opciones de envío configuradas' });
+    }
+
+    // Calcular costo
+    const cost = shippingOption.base_price + shippingOption.price_per_kilo * totalWeight;
+
+    res.json({
+      estimated_cost: cost,
+      estimated_days: shippingOption.estimated_days,
+      total_weight: totalWeight
+    });
+
+  } catch (error) {
+    console.error('Error calculando costo de envío:', error);
+    res.status(500).json({ error: 'Error interno del servidor' });
+  }
+};

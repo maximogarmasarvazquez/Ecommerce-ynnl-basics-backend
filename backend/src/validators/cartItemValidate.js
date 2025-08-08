@@ -1,7 +1,8 @@
+// middlewares/validateCartItemOwnership.js
 const { PrismaClient } = require('@prisma/client');
 const prisma = new PrismaClient();
 
-const checkCartItemOwnership = async (req, res, next) => {
+const validateCartItemOwnership = async (req, res, next) => {
   try {
     const itemId = req.params.id;
 
@@ -29,4 +30,4 @@ const checkCartItemOwnership = async (req, res, next) => {
   }
 };
 
-module.exports = { checkCartItemOwnership };
+module.exports = { validateCartItemOwnership };

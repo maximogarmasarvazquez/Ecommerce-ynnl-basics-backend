@@ -2,7 +2,9 @@ const { PrismaClient } = require('@prisma/client');
 const prisma = new PrismaClient();
 const { validationResult } = require('express-validator');
 
-// Crear pago
+const allowedPaymentMethods = ['mercado_pago', 'credit_card', 'paypal']; // ajustar según métodos válidos
+const allowedStatuses = ['pending', 'approved', 'rejected', 'cancelled'];
+
 exports.createPayment = async (req, res) => {
   try {
     const errors = validationResult(req);
@@ -11,11 +13,15 @@ exports.createPayment = async (req, res) => {
 
     const { order_id, payment_method, status, amount, transaction_id } = req.body;
 
-    // Validar que la orden exista
+    if (!allowedPaymentMethods.includes(payment_method)) {
+      return res.status(400).json({ error: 'Método de pago no válido' });
+    }
+    if (!allowedStatuses.includes(status)) {
+      return res.status(400).json({ error: 'Estado de pago no válido' });
+    }
+
     const order = await prisma.order.findUnique({ where: { id: order_id } });
     if (!order) return res.status(404).json({ error: 'Orden no encontrada' });
-
-    // Opcional: podrías validar aquí que 'status' esté dentro de estados permitidos (ej: 'pending', 'approved', 'rejected')
 
     const payment = await prisma.payment.create({
       data: {
@@ -34,7 +40,6 @@ exports.createPayment = async (req, res) => {
   }
 };
 
-// Obtener pago por ID
 exports.getPaymentById = async (req, res) => {
   try {
     const { id } = req.params;
@@ -50,7 +55,6 @@ exports.getPaymentById = async (req, res) => {
   }
 };
 
-// Actualizar pago (status, amount, transaction_id)
 exports.updatePayment = async (req, res) => {
   try {
     const errors = validationResult(req);
@@ -60,7 +64,11 @@ exports.updatePayment = async (req, res) => {
     const { id } = req.params;
     const { status, amount, transaction_id } = req.body;
 
-    // Opcional: validar status permitido
+    if (status && !allowedStatuses.includes(status)) {
+      return res.status(400).json({ error: 'Estado de pago no válido' });
+    }
+
+    // Podrías agregar validación de amount y transaction_id si quieres
 
     const payment = await prisma.payment.update({
       where: { id },
@@ -77,7 +85,6 @@ exports.updatePayment = async (req, res) => {
   }
 };
 
-// Eliminar pago
 exports.deletePayment = async (req, res) => {
   try {
     const { id } = req.params;
@@ -92,7 +99,6 @@ exports.deletePayment = async (req, res) => {
   }
 };
 
-// Listar pagos (opcional: filtrar por orden)
 exports.getAllPayments = async (req, res) => {
   try {
     const { order_id } = req.query;

@@ -29,16 +29,16 @@ exports.createCartItem = async (req, res) => {
 
     const product_id = productSize.product_id;
 
-    // Crear el ítem en el carrito
+    // Crear el ítem en el carrito usando `connect`
     const newCartItem = await prisma.cartItem.create({
       data: {
-        cart_id,
-        product_size_id,
-        product_id,
         quantity,
+        cart: { connect: { id: cart_id } },
+        productSize: { connect: { id: product_size_id } },
+        product: { connect: { id: product_id } },
       },
       include: {
-        productSize: true,
+        productSize: { include: { product: true } },
         product: true,
       },
     });

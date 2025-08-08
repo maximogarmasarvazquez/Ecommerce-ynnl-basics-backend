@@ -9,6 +9,8 @@ router.post('/', verifyToken, checkRole('admin'), validateShipping, shippingCont
 router.put('/:id', verifyToken, checkRole('admin'), validateShipping, shippingController.updateShipping);
 router.delete('/:id', verifyToken, checkRole('admin'), shippingController.deleteShipping);
 
+router.post('/calculate', verifyToken,  shippingController.calculateShippingCost);
+
 // Rutas públicas para obtener métodos de envío
 router.get('/', shippingController.getAllShippings);
 router.get('/:id', shippingController.getShippingById);

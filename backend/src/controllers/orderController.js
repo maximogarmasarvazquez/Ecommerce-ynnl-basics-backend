@@ -1,7 +1,7 @@
 const { PrismaClient } = require('@prisma/client');
 const prisma = new PrismaClient();
 
-// Crear una orden y su pago
+// Crear una orden y su pago (anidado)
 exports.createOrder = async (req, res) => {
   try {
     const userId = req.user.id;
@@ -52,7 +52,7 @@ exports.createOrder = async (req, res) => {
     const shippingCost = shipping.base_price + shipping.price_per_kilo * totalWeight;
     total += shippingCost;
 
-    // Crear orden y luego el pago
+    // Crear orden junto con el pago (nested create)
     const newOrder = await prisma.order.create({
       data: {
         user_id: userId,
@@ -67,6 +67,13 @@ exports.createOrder = async (req, res) => {
             product_id: psMap[item.product_size_id].product_id,
           })),
         },
+        payment: {
+          create: {
+            payment_method: 'mercado_pago', // Cambiar si usás otro método
+            status: 'pending',
+            amount: total,
+          },
+        },
       },
       include: {
         items: {
@@ -77,19 +84,11 @@ exports.createOrder = async (req, res) => {
         shipping: true,
         user: true,
         address: true,
+        payment: true,
       },
     });
 
-    const payment = await prisma.payment.create({
-      data: {
-        order_id: newOrder.id,
-        payment_method: 'mercado_pago', // Esto lo podés cambiar si usás otro método
-        status: 'pending',
-        amount: total,
-      },
-    });
-
-    res.status(201).json({ order: newOrder, payment });
+    res.status(201).json(newOrder);
   } catch (error) {
     console.error('Error al crear orden:', error);
     res.status(500).json({ error: 'Error al crear orden' });

@@ -129,6 +129,8 @@ model Order {
   address      Address    @relation(fields: [address_id], references: [id], onDelete: Cascade)
 
   items        OrderItem[]
+
+  payment      Payment?   @relation
 }
 
 model OrderItem {

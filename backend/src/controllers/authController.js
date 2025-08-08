@@ -17,7 +17,6 @@ exports.validateLogin = [
   body('password').notEmpty().withMessage('Contraseña requerida'),
 ];
 
-// Registro
 exports.register = async (req, res) => {
   const errors = validationResult(req);
   if (!errors.isEmpty()) {
@@ -34,6 +33,7 @@ exports.register = async (req, res) => {
 
     const hashedPassword = await bcrypt.hash(password, 10);
 
+    // 1. Crear el usuario
     const newUser = await prisma.user.create({
       data: {
         name,
@@ -43,11 +43,32 @@ exports.register = async (req, res) => {
       },
     });
 
+    // 2. Crear el carrito solo si es cliente (evitar duplicados)
+    await prisma.cart.create({
+      data: {
+        user_id: newUser.id,
+      },
+    });
+
     const { password: _, ...userWithoutPassword } = newUser;
 
-    res.status(201).json({ message: 'Usuario registrado correctamente', user: userWithoutPassword });
+    res.status(201).json({
+      message: 'Usuario registrado correctamente',
+      user: userWithoutPassword
+    });
+
   } catch (error) {
     console.error('Error en registro:', error);
+
+    if (
+      error.code === 'P2002' &&
+      error.meta?.target?.includes('user_id')
+    ) {
+      return res.status(400).json({
+        error: 'Este usuario ya tiene un carrito asignado.',
+      });
+    }
+
     res.status(500).json({ error: 'Error al registrar el usuario' });
   }
 };

@@ -9,17 +9,14 @@ exports.createUser = async (req, res) => {
   try {
     const { name, email, password, role } = req.body;
 
-    // Validar datos mínimos
     if (!name || !email || !password) {
       return res.status(400).json({ error: 'Faltan datos obligatorios' });
     }
 
-    // Validar rol
     if (role && !validRoles.includes(role)) {
       return res.status(400).json({ error: 'Rol inválido' });
     }
 
-    // Verificar que no exista usuario con el mismo email
     const existingUser = await prisma.user.findUnique({ where: { email } });
     if (existingUser) {
       return res.status(400).json({ error: 'Email ya registrado' });
@@ -32,28 +29,50 @@ exports.createUser = async (req, res) => {
         name,
         email,
         password: hashedPassword,
-        role: role || 'client', // si no viene rol, por defecto 'client'
+        role: role || 'client',
       },
     });
 
-    // No devolver la password
-    const { password: _, ...userWithoutPassword } = newUser;
+    // 🛒 Si el rol es cliente, crear carrito solo si no existe
+    if ((role || 'client') === 'client') {
+      const existingCart = await prisma.cart.findUnique({
+        where: { user_id: newUser.id },
+      });
+
+      if (!existingCart) {
+        await prisma.cart.create({
+          data: { user_id: newUser.id },
+        });
+      }
+    }
 
     res.status(201).json({
-  message: 'Usuario creado exitosamente',
-  user: {
-    id: newUser.id,
-    name: newUser.name,
-    email: newUser.email,
-    role: newUser.role,
-    created_at: newUser.created_at,
-  },
-});
+      message: 'Usuario creado exitosamente',
+      user: {
+        id: newUser.id,
+        name: newUser.name,
+        email: newUser.email,
+        role: newUser.role,
+        created_at: newUser.created_at,
+      },
+    });
   } catch (error) {
     console.error('Error al crear usuario:', error);
+
+    // Validación especial si se intenta crear un carrito duplicado
+    if (
+      error.code === 'P2002' &&
+      error.meta?.target?.includes('user_id')
+    ) {
+      return res.status(400).json({
+        error: 'Este usuario ya tiene un carrito asignado.',
+      });
+    }
+
     res.status(500).json({ error: 'Error al crear el usuario' });
   }
 };
+
 
 
 // Obtener todos los usuarios
