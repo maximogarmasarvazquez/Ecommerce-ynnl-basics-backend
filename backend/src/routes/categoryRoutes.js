@@ -4,8 +4,8 @@ const categoryController = require('../controllers/categoryController');
 const { verifyToken, checkRole } = require('../middlewares/authMiddleware.js');
 const { validateCategory } = require('../validators/categoryValidate');
 
-router.get('/', verifyToken,categoryController.getAllCategories);
-router.get('/:id',verifyToken, categoryController.getCategoryById);
+router.get('/',categoryController.getAllCategories);
+router.get('/:id', categoryController.getCategoryById);
 
 // Solo admin
 router.post('/', verifyToken, checkRole('admin'), validateCategory, categoryController.createCategory);

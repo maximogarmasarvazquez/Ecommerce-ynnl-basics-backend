@@ -59,6 +59,9 @@ CREATE TABLE "ProductSize" (
     "size" TEXT NOT NULL,
     "stock" INTEGER NOT NULL,
     "weight" DOUBLE PRECISION NOT NULL,
+    "length" DOUBLE PRECISION,
+    "width" DOUBLE PRECISION,
+    "height" DOUBLE PRECISION,
     "product_id" TEXT NOT NULL,
 
     CONSTRAINT "ProductSize_pkey" PRIMARY KEY ("id")
@@ -92,6 +95,9 @@ CREATE TABLE "Shipping" (
     "base_price" DOUBLE PRECISION NOT NULL,
     "price_per_kilo" DOUBLE PRECISION NOT NULL,
     "estimated_days" INTEGER NOT NULL,
+    "external_service_code" TEXT,
+    "description" TEXT,
+    "active" BOOLEAN NOT NULL DEFAULT true,
 
     CONSTRAINT "Shipping_pkey" PRIMARY KEY ("id")
 );
@@ -103,6 +109,9 @@ CREATE TABLE "Order" (
     "shipping_id" TEXT NOT NULL,
     "address_id" TEXT NOT NULL,
     "total" DOUBLE PRECISION NOT NULL,
+    "shipping_cost" DOUBLE PRECISION,
+    "paqar_sucursal_cost" DOUBLE PRECISION,
+    "paqar_domicilio_cost" DOUBLE PRECISION,
     "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updated_at" TIMESTAMP(3) NOT NULL,
 

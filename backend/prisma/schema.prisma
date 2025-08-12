@@ -74,6 +74,9 @@ model ProductSize {
   size         String
   stock        Int
   weight       Float
+  length       Float?       // cm, opcional
+  width        Float?       // cm, opcional
+  height       Float?       // cm, opcional
 
   product_id   String
   product      Product       @relation(fields: [product_id], references: [id], onDelete: Cascade)
@@ -106,31 +109,37 @@ model CartItem {
 }
 
 model Shipping {
-  id             String   @id @default(uuid())
-  name           String
-  base_price     Float
-  price_per_kilo Float
-  estimated_days Int
+  id                   String   @id @default(uuid())
+  name                 String
+  base_price           Float
+  price_per_kilo       Float
+  estimated_days       Int
+  external_service_code String?  // código del servicio Correo Argentino
+  description          String?  // campo opcional
+  active               Boolean  @default(true)
 
   orders Order[]
 }
 
 model Order {
-  id           String     @id @default(uuid())
-  user_id      String
-  shipping_id  String
-  address_id   String
-  total        Float
-  created_at   DateTime   @default(now())
-  updated_at   DateTime   @updatedAt
+  id             String    @id @default(uuid())
+  user_id        String
+  shipping_id    String
+  address_id     String
+  total          Float
+  shipping_cost  Float?    // costo seleccionado, por ej. aDomicilio
+  paqar_sucursal_cost Float?  // costo retiro sucursal
+  paqar_domicilio_cost Float? // costo a domicilio
+  created_at     DateTime  @default(now())
+  updated_at     DateTime  @updatedAt
 
-  user         User       @relation(fields: [user_id], references: [id], onDelete: Cascade)
-  shipping     Shipping   @relation(fields: [shipping_id], references: [id])
-  address      Address    @relation(fields: [address_id], references: [id], onDelete: Cascade)
+  user        User     @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  shipping    Shipping @relation(fields: [shipping_id], references: [id])
+  address     Address  @relation(fields: [address_id], references: [id], onDelete: Cascade)
 
-  items        OrderItem[]
+  items       OrderItem[]
 
-  payment      Payment?   @relation
+  payment     Payment? @relation
 }
 
 model OrderItem {
@@ -151,7 +160,7 @@ model OrderItem {
 model Payment {
   id             String    @id @default(uuid())
   
-  order_id       String    @unique  // Si solo permitís un pago por orden, agregar @unique
+  order_id       String    @unique
   order          Order     @relation(fields: [order_id], references: [id], onDelete: Cascade)
   
   payment_method String

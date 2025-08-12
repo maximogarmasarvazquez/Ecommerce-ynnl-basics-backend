@@ -7,7 +7,7 @@ const rateLimit = require('express-rate-limit');
 
 const app = express();
 
-// Middlewares básicos
+
 app.use(cors());
 app.use(express.json());
 
@@ -39,7 +39,6 @@ const shippingRoutes = require('./routes/shippingRoutes');
 const orderItemRoutes = require('./routes/orderItemRoutes');
 const addressRoutes = require('./routes/addressRoutes');
 const paymentRoutes = require('./routes/paymentRoutes');
-
 // Usar rutas
 app.use('/products', productRoutes);
 app.use('/categories', categoryRoutes);

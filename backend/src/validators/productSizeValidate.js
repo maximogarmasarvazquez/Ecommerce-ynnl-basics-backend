@@ -12,11 +12,24 @@ const validateProductSize = [
 
   body('weight')
     .notEmpty().withMessage('El weight es obligatorio')
-    .isFloat({ min: 0 }).withMessage('El weight debe ser un número decimal mayor o igual a 0'),
+    .isFloat({ gt: 0 }).withMessage('El weight debe ser un número decimal mayor que 0'),
 
-  body('product_id')  // aquí el cambio
-    .notEmpty().withMessage('El product_id es obligatorio')
-    .isUUID().withMessage('El product_id debe ser un UUID válido'),
+  body('productId')
+    .notEmpty().withMessage('El productId es obligatorio')
+    .isUUID().withMessage('El productId debe ser un UUID válido'),
+
+  // Opcionales para dimensiones
+  body('length')
+    .optional()
+    .isFloat({ gt: 0 }).withMessage('El length debe ser un número positivo'),
+
+  body('width')
+    .optional()
+    .isFloat({ gt: 0 }).withMessage('El width debe ser un número positivo'),
+
+  body('height')
+    .optional()
+    .isFloat({ gt: 0 }).withMessage('El height debe ser un número positivo'),
 
   (req, res, next) => {
     const errors = validationResult(req);

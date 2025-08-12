@@ -1,10 +1,24 @@
 const { PrismaClient } = require('@prisma/client');
 const prisma = new PrismaClient();
+const { calcularPesoVolumetrico, calcularCostoEnvio } = require('../envioService');
 
 // Crear nuevo método de envío
 exports.createShipping = async (req, res) => {
   try {
-    const { name, base_price, price_per_kilo, estimated_days } = req.body;
+    const {
+      name,
+      base_price,
+      price_per_kilo,
+      estimated_days,
+      external_service_code,
+      description,
+      active = true,  // por defecto activo
+    } = req.body;
+
+    // Validá que los campos obligatorios estén presentes
+    if (!name || base_price == null || price_per_kilo == null || estimated_days == null) {
+      return res.status(400).json({ message: 'Faltan datos obligatorios para crear el método de envío' });
+    }
 
     const newShipping = await prisma.shipping.create({
       data: {
@@ -12,6 +26,9 @@ exports.createShipping = async (req, res) => {
         base_price,
         price_per_kilo,
         estimated_days,
+        external_service_code,
+        description,
+        active,
       },
     });
 
@@ -92,18 +109,24 @@ exports.deleteShipping = async (req, res) => {
   }
 };
 
-// NUEVO: Calcular costo estimado de envío
 exports.calculateShippingCost = async (req, res) => {
   try {
-    const { items, postal_code } = req.body; 
-    // items: [{ product_size_id, quantity }, ...]
+    const { items, postal_code, shipping_id, provinciaDestino } = req.body;
 
-    if (!items || !Array.isArray(items) || items.length === 0) {
+    if (!items || !Array.isArray(items) || items.length === 0)
       return res.status(400).json({ error: 'Debe enviar items para calcular el envío' });
-    }
+    if (!shipping_id || !postal_code || !provinciaDestino)
+      return res.status(400).json({ error: 'Faltan parámetros obligatorios' });
 
-    // Calcular peso total
+    const shipping = await prisma.shipping.findUnique({ where: { id: shipping_id } });
+    if (!shipping) return res.status(400).json({ error: 'Método de envío inválido' });
+
+    const cpOrigen = process.env.ORIGIN_CP || shipping.external_service_code || '5194';
+    const provinciaOrigen = process.env.ORIGIN_PROV || 'AR-X';
+
     let totalWeight = 0;
+    let maxPesoVol = 0;
+
     for (const item of items) {
       const productSize = await prisma.productSize.findUnique({
         where: { id: item.product_size_id }
@@ -112,26 +135,39 @@ exports.calculateShippingCost = async (req, res) => {
         return res.status(400).json({ error: `Product size no encontrado: ${item.product_size_id}` });
       }
       totalWeight += productSize.weight * item.quantity;
+
+      if (productSize.length && productSize.width && productSize.height) {
+        const pesoVol = await calcularPesoVolumetrico(productSize.length, productSize.width, productSize.height);
+        if (pesoVol > maxPesoVol) maxPesoVol = pesoVol;
+      }
     }
 
-    // Obtener método de envío para calcular costo (aquí podés mejorar según postal_code)
-    const shippingOption = await prisma.shipping.findFirst();
+    const pesoFacturable = Math.max(totalWeight, maxPesoVol);
 
-    if (!shippingOption) {
-      return res.status(500).json({ error: 'No hay opciones de envío configuradas' });
-    }
+    console.log('Datos para calcularCostoEnvio:', { cpOrigen, cpDestino: postal_code, provinciaOrigen, provinciaDestino, peso: pesoFacturable });
 
-    // Calcular costo
-    const cost = shippingOption.base_price + shippingOption.price_per_kilo * totalWeight;
+    const costo = await calcularCostoEnvio({
+      cpOrigen,
+      cpDestino: postal_code,
+      provinciaOrigen,
+      provinciaDestino,
+      peso: pesoFacturable,
+    });
 
     res.json({
-      estimated_cost: cost,
-      estimated_days: shippingOption.estimated_days,
-      total_weight: totalWeight
+      estimated_cost: costo,
+      estimated_days: shipping.estimated_days || 'Desconocido',
+      total_weight: totalWeight,
+      peso_volumetrico: maxPesoVol,
+      peso_facturable: pesoFacturable,
     });
 
   } catch (error) {
-    console.error('Error calculando costo de envío:', error);
+    if (error.response) {
+      console.error('API Response error:', error.response.data);
+    } else {
+      console.error('Error:', error.message);
+    }
     res.status(500).json({ error: 'Error interno del servidor' });
   }
 };
